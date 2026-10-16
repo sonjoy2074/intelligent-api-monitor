@@ -1,4 +1,4 @@
-const Anomaly = require('../models/Anomaly');
+const alertStore = require('../services/alertStore');
 const { detectAnomalies } = require('../services/anomalyDetector');
 const { generateAlertWithAI } = require('../services/llmService');
 const { sendAlertEmail } = require('../services/emailService');
@@ -44,10 +44,10 @@ const processApiData = async (req, res, next) => {
         // Generate AI alert summary
         const aiAlert = await generateAlertWithAI(detectionResult);
 
-        // Save anomaly to database
+        // Save anomaly via alertStore (persists to MongoDB, or in-memory fallback)
         let savedAnomaly = null;
         try {
-          savedAnomaly = await Anomaly.create({
+          savedAnomaly = await alertStore.saveAnomaly({
             api_name: item.api_name,
             response_time_ms: item.response_time_ms,
             status_code: item.status_code,
@@ -64,15 +64,13 @@ const processApiData = async (req, res, next) => {
               logger.error(`Async email failed: ${err.message}`)
             );
           }
-        } catch (dbErr) {
-          logger.error(`Database save error: ${dbErr.message}`);
-          // Fallback object if MongoDB isn't connected
+        } catch (saveErr) {
+          logger.error(`Alert save error: ${saveErr.message}`);
           savedAnomaly = {
             ...item,
             anomaly_types: detectionResult.anomaly_types,
             severity: detectionResult.severity,
-            ai_alert: aiAlert,
-            db_saved: false
+            ai_alert: aiAlert
           };
         }
 

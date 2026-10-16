@@ -3,12 +3,14 @@ const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/intelligent-api-monitor');
+    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/intelligent-api-monitor', {
+      serverSelectionTimeoutMS: 2000
+    });
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    logger.error(`Database connection error: ${error.message}`);
-    // Optional: Keep server running or gracefully retry based on requirements
+    logger.warn(`MongoDB not reachable (${error.message}). Running with resilient in-memory storage.`);
   }
 };
 
 module.exports = connectDB;
+

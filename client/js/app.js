@@ -1,25 +1,34 @@
 /**
  * PulseAI Dashboard Client Logic
+ * Handles telemetry ingestion, alert rendering, metrics, and UI state management.
  */
 
 const API_BASE = '';
 
-const elements = {
-  telemetryInput: document.getElementById('telemetry-input'),
-  btnLoadSample: document.getElementById('btn-load-sample'),
-  btnSimulateOutage: document.getElementById('btn-simulate-outage'),
-  btnSendTelemetry: document.getElementById('btn-send-telemetry'),
-  btnRefreshAlerts: document.getElementById('refresh-alerts-btn'),
-  ingestStatus: document.getElementById('ingest-status'),
-  alertsList: document.getElementById('alerts-list'),
-  alertsCountBadge: document.getElementById('alerts-count-badge'),
-  severityFilter: document.getElementById('severity-filter'),
-  statActiveCount: document.getElementById('stat-active-count'),
-  statCriticalCount: document.getElementById('stat-critical-count'),
-  statAvgLatency: document.getElementById('stat-avg-latency')
-};
+// ─── DOM Element References ───
+const elements = {};
 
-// Benchmark sample data from task specification
+function cacheElements() {
+  elements.telemetryInput = document.getElementById('telemetry-input');
+  elements.btnLoadSample = document.getElementById('btn-load-sample');
+  elements.btnSimulateOutage = document.getElementById('btn-simulate-outage');
+  elements.btnSendTelemetry = document.getElementById('btn-send-telemetry');
+  elements.btnSendText = document.getElementById('btn-send-text');
+  elements.btnSendSpinner = document.getElementById('btn-send-spinner');
+  elements.btnRefreshAlerts = document.getElementById('refresh-alerts-btn');
+  elements.ingestStatus = document.getElementById('ingest-status');
+  elements.ingestResults = document.getElementById('ingest-results');
+  elements.alertsList = document.getElementById('alerts-list');
+  elements.alertsCountBadge = document.getElementById('alerts-count-badge');
+  elements.severityFilter = document.getElementById('severity-filter');
+  elements.statActiveCount = document.getElementById('stat-active-count');
+  elements.statCriticalCount = document.getElementById('stat-critical-count');
+  elements.statAvgLatency = document.getElementById('stat-avg-latency');
+  elements.statHealthyCount = document.getElementById('stat-healthy-count');
+  elements.connectionStatus = document.getElementById('connection-status');
+}
+
+// ─── Benchmark & Simulation Data ───
 const BENCHMARK_SAMPLE = [
   {
     "api_name": "PatientDataAPI",
@@ -53,30 +62,67 @@ const OUTAGE_SIMULATION = [
     "response_time_ms": 7800,
     "status_code": 503,
     "records_returned": 0
+  },
+  {
+    "api_name": "LabResultsAPI",
+    "response_time_ms": 6200,
+    "status_code": 504,
+    "records_returned": 0
   }
 ];
 
-// Fetch and render alerts from /alerts
+// ─── State ───
+let lastIngestResults = null;
+
+// ─── Fetch and render alerts from /alerts ───
 async function fetchAlerts() {
   try {
     const severity = elements.severityFilter.value;
     const url = severity ? `${API_BASE}/alerts?severity=${severity}` : `${API_BASE}/alerts`;
 
     const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`);
+    }
+
     const data = await response.json();
 
     if (data.success) {
       renderAlerts(data.data || []);
       updateMetrics(data.data || []);
+      setConnectionStatus(true);
     }
   } catch (error) {
     console.error('Failed to fetch alerts:', error);
+    setConnectionStatus(false);
   }
 }
 
-// Render alert cards
+// ─── Connection Status Indicator ───
+function setConnectionStatus(isOnline) {
+  if (!elements.connectionStatus) return;
+  if (isOnline) {
+    elements.connectionStatus.classList.remove('offline');
+    elements.connectionStatus.classList.add('online');
+    elements.connectionStatus.innerHTML = '<span class="dot"></span><span>Engine Active</span>';
+  } else {
+    elements.connectionStatus.classList.remove('online');
+    elements.connectionStatus.classList.add('offline');
+    elements.connectionStatus.innerHTML = '<span class="dot"></span><span>Disconnected</span>';
+  }
+}
+
+// ─── Render alert cards ───
 function renderAlerts(alerts) {
   elements.alertsCountBadge.textContent = alerts.length;
+
+  // Animate badge when alerts exist
+  if (alerts.length > 0) {
+    elements.alertsCountBadge.classList.add('has-alerts');
+  } else {
+    elements.alertsCountBadge.classList.remove('has-alerts');
+  }
 
   if (alerts.length === 0) {
     elements.alertsList.innerHTML = `
@@ -91,17 +137,19 @@ function renderAlerts(alerts) {
 
   elements.alertsList.innerHTML = alerts
     .map((alert) => {
-      const dateStr = alert.createdAt ? new Date(alert.createdAt).toLocaleTimeString() : 'Just now';
+      const dateStr = alert.createdAt
+        ? new Date(alert.createdAt).toLocaleString()
+        : 'Just now';
       const id = alert._id || alert.id || '';
 
       return `
-      <article class="alert-item severity-${alert.severity}">
+      <article class="alert-item severity-${escapeHtml(alert.severity)}">
         <div class="alert-header-row">
           <div class="alert-api-title">
             <span>🌐</span>
             <span>${escapeHtml(alert.api_name)}</span>
           </div>
-          <span class="severity-pill">${alert.severity}</span>
+          <span class="severity-pill">${escapeHtml(alert.severity)}</span>
         </div>
 
         <div class="alert-metrics-chips">
@@ -120,7 +168,7 @@ function renderAlerts(alerts) {
 
         <div class="alert-footer-row">
           <span>Detected: ${dateStr}</span>
-          ${id ? `<button class="btn-resolve" onclick="resolveAlert('${id}')">Resolve</button>` : ''}
+          ${id ? `<button class="btn-resolve" onclick="resolveAlert('${id}')">✓ Resolve</button>` : ''}
         </div>
       </article>
     `;
@@ -128,7 +176,7 @@ function renderAlerts(alerts) {
     .join('');
 }
 
-// Calculate and display metrics
+// ─── Calculate and display metrics ───
 function updateMetrics(alerts) {
   elements.statActiveCount.textContent = alerts.length;
 
@@ -140,11 +188,29 @@ function updateMetrics(alerts) {
     const avgLatency = Math.round(totalLatency / alerts.length);
     elements.statAvgLatency.textContent = `${avgLatency} ms`;
   } else {
-    elements.statAvgLatency.textContent = `0 ms`;
+    elements.statAvgLatency.textContent = '0 ms';
+  }
+
+  // Update healthy count from last ingestion
+  if (lastIngestResults) {
+    const healthyCount = lastIngestResults.filter(r => r.status === 'healthy').length;
+    elements.statHealthyCount.textContent = healthyCount;
   }
 }
 
-// Send telemetry to /monitor
+// ─── Loading state for send button ───
+function setLoading(isLoading) {
+  elements.btnSendTelemetry.disabled = isLoading;
+  if (isLoading) {
+    elements.btnSendText.classList.add('hidden');
+    elements.btnSendSpinner.classList.remove('hidden');
+  } else {
+    elements.btnSendText.classList.remove('hidden');
+    elements.btnSendSpinner.classList.add('hidden');
+  }
+}
+
+// ─── Send telemetry to /monitor ───
 async function sendTelemetry() {
   const content = elements.telemetryInput.value.trim();
   if (!content) {
@@ -156,11 +222,12 @@ async function sendTelemetry() {
   try {
     parsed = JSON.parse(content);
   } catch (err) {
-    showStatus('Invalid JSON format', 'danger');
+    showStatus('Invalid JSON format — please check syntax', 'danger');
     return;
   }
 
-  showStatus('Ingesting & analyzing...', 'info');
+  setLoading(true);
+  showStatus('Ingesting & analyzing with AI...', 'info');
 
   try {
     const res = await fetch(`${API_BASE}/monitor`, {
@@ -169,19 +236,59 @@ async function sendTelemetry() {
       body: JSON.stringify(parsed)
     });
 
+    if (!res.ok) {
+      throw new Error(`Server responded with ${res.status}`);
+    }
+
     const result = await res.json();
     if (result.success) {
-      showStatus(`Processed ${result.total_processed} APIs (${result.anomalies_count} anomalies detected)`, 'success');
+      lastIngestResults = result.results || [];
+      showStatus(
+        `✅ Processed ${result.total_processed} APIs — ${result.anomalies_count} anomalies detected`,
+        'success'
+      );
+      renderIngestResults(result.results || []);
       fetchAlerts();
     } else {
       showStatus(result.message || 'Error occurred', 'danger');
     }
   } catch (error) {
-    showStatus('Failed to send request: ' + error.message, 'danger');
+    showStatus('Failed to send: ' + error.message, 'danger');
+    setConnectionStatus(false);
+  } finally {
+    setLoading(false);
   }
 }
 
-// Resolve an alert
+// ─── Render ingestion results breakdown ───
+function renderIngestResults(results) {
+  if (!results || results.length === 0) {
+    elements.ingestResults.classList.add('hidden');
+    return;
+  }
+
+  elements.ingestResults.classList.remove('hidden');
+  elements.ingestResults.innerHTML = results.map(r => {
+    let icon, cls;
+    if (r.status === 'healthy') {
+      icon = '✅'; cls = 'healthy';
+    } else if (r.status === 'anomaly_detected') {
+      icon = '⚠️'; cls = 'anomaly';
+    } else {
+      icon = '⏭️'; cls = 'skipped';
+    }
+
+    let detail = r.status === 'anomaly_detected'
+      ? ` — ${escapeHtml(r.severity)} (${escapeHtml((r.issues || []).join(', '))})`
+      : r.status === 'skipped'
+        ? ` — ${escapeHtml(r.reason || 'Skipped')}`
+        : ' — All checks passed';
+
+    return `<div class="result-line ${cls}">${icon} <strong>${escapeHtml(r.api_name)}</strong>${detail}</div>`;
+  }).join('');
+}
+
+// ─── Resolve an alert ───
 window.resolveAlert = async function(id) {
   try {
     const res = await fetch(`${API_BASE}/alerts/${id}/resolve`, {
@@ -196,44 +303,56 @@ window.resolveAlert = async function(id) {
   }
 };
 
+// ─── Utilities ───
 function showStatus(text, type = 'info') {
   elements.ingestStatus.textContent = text;
-  elements.ingestStatus.style.color = type === 'danger' ? '#ef4444' : type === 'success' ? '#10b981' : '#94a3b8';
+  const colors = {
+    danger: '#ef4444',
+    success: '#10b981',
+    info: '#94a3b8'
+  };
+  elements.ingestStatus.style.color = colors[type] || colors.info;
+
+  // Auto-clear after 6 seconds
   setTimeout(() => {
     if (elements.ingestStatus.textContent === text) {
       elements.ingestStatus.textContent = '';
     }
-  }, 4000);
+  }, 6000);
 }
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/[&<>"']/g, function(m) {
-    return {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    }[m];
-  });
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
 }
 
-// Event Listeners
-elements.btnLoadSample.addEventListener('click', () => {
-  elements.telemetryInput.value = JSON.stringify(BENCHMARK_SAMPLE, null, 2);
-});
-
-elements.btnSimulateOutage.addEventListener('click', () => {
-  elements.telemetryInput.value = JSON.stringify(OUTAGE_SIMULATION, null, 2);
-});
-
-elements.btnSendTelemetry.addEventListener('click', sendTelemetry);
-elements.btnRefreshAlerts.addEventListener('click', fetchAlerts);
-elements.severityFilter.addEventListener('change', fetchAlerts);
-
-// Initial load
+// ─── Event Listeners & Init ───
 document.addEventListener('DOMContentLoaded', () => {
+  cacheElements();
+
+  // Pre-populate with benchmark data
   elements.telemetryInput.value = JSON.stringify(BENCHMARK_SAMPLE, null, 2);
+
+  // Button handlers
+  elements.btnLoadSample.addEventListener('click', () => {
+    elements.telemetryInput.value = JSON.stringify(BENCHMARK_SAMPLE, null, 2);
+    elements.ingestResults.classList.add('hidden');
+  });
+
+  elements.btnSimulateOutage.addEventListener('click', () => {
+    elements.telemetryInput.value = JSON.stringify(OUTAGE_SIMULATION, null, 2);
+    elements.ingestResults.classList.add('hidden');
+  });
+
+  elements.btnSendTelemetry.addEventListener('click', sendTelemetry);
+  elements.btnRefreshAlerts.addEventListener('click', fetchAlerts);
+  elements.severityFilter.addEventListener('change', fetchAlerts);
+
+  // Initial data load
   fetchAlerts();
+
+  // Auto-refresh alerts every 30 seconds
+  setInterval(fetchAlerts, 30000);
 });

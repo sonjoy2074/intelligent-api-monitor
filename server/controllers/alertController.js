@@ -1,4 +1,4 @@
-const Anomaly = require('../models/Anomaly');
+const alertStore = require('../services/alertStore');
 
 /**
  * Fetch all active anomalies / alerts
@@ -8,13 +8,7 @@ const getActiveAlerts = async (req, res, next) => {
   try {
     const { severity, api_name, limit = 50 } = req.query;
 
-    const query = { is_active: true };
-    if (severity) query.severity = severity.toUpperCase();
-    if (api_name) query.api_name = new RegExp(api_name, 'i');
-
-    const alerts = await Anomaly.find(query)
-      .sort({ createdAt: -1 })
-      .limit(Number(limit));
+    const alerts = await alertStore.getAlerts({ severity, api_name, limit });
 
     return res.status(200).json({
       success: true,
@@ -33,11 +27,7 @@ const getActiveAlerts = async (req, res, next) => {
 const resolveAlert = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const alert = await Anomaly.findByIdAndUpdate(
-      id,
-      { is_active: false },
-      { new: true }
-    );
+    const alert = await alertStore.resolveAlertById(id);
 
     if (!alert) {
       return res.status(404).json({ success: false, message: 'Alert not found' });
