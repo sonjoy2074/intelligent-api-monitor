@@ -26,6 +26,7 @@ function cacheElements() {
   elements.statAvgLatency = document.getElementById('stat-avg-latency');
   elements.statHealthyCount = document.getElementById('stat-healthy-count');
   elements.connectionStatus = document.getElementById('connection-status');
+  elements.btnTestEmail = document.getElementById('btn-test-email');
 }
 
 // ─── Benchmark & Simulation Data ───
@@ -243,9 +244,12 @@ async function sendTelemetry() {
     const result = await res.json();
     if (result.success) {
       lastIngestResults = result.results || [];
+      const emailNotice = result.email_dispatched
+        ? ' & email report dispatched 📧'
+        : '';
       showStatus(
-        `✅ Processed ${result.total_processed} APIs — ${result.anomalies_count} anomalies detected`,
-        'success'
+        `✅ Processed ${result.total_processed} APIs — ${result.anomalies_count} anomalies detected${emailNotice}`,
+        result.anomalies_count > 0 ? 'danger' : 'success'
       );
       renderIngestResults(result.results || []);
       fetchAlerts();
@@ -328,6 +332,31 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ─── Test email alert ───
+async function sendTestEmailAlert() {
+  if (!elements.btnTestEmail) return;
+  const originalHtml = elements.btnTestEmail.innerHTML;
+  elements.btnTestEmail.disabled = true;
+  elements.btnTestEmail.innerHTML = '<span class="btn-icon">⏳</span> Sending...';
+
+  try {
+    const res = await fetch(`${API_BASE}/alerts/test-email`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Email Success:\n${data.message}`);
+    } else {
+      alert(`⚠️ Email Alert Error:\n${data.message}`);
+    }
+  } catch (err) {
+    alert(`❌ Server Connection Error:\n${err.message}`);
+  } finally {
+    elements.btnTestEmail.disabled = false;
+    elements.btnTestEmail.innerHTML = originalHtml;
+  }
+}
+
 // ─── Event Listeners & Init ───
 document.addEventListener('DOMContentLoaded', () => {
   cacheElements();
@@ -350,9 +379,14 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.btnRefreshAlerts.addEventListener('click', fetchAlerts);
   elements.severityFilter.addEventListener('change', fetchAlerts);
 
+  if (elements.btnTestEmail) {
+    elements.btnTestEmail.addEventListener('click', sendTestEmailAlert);
+  }
+
   // Initial data load
   fetchAlerts();
 
   // Auto-refresh alerts every 30 seconds
   setInterval(fetchAlerts, 30000);
 });
+

@@ -1,7 +1,7 @@
 const alertStore = require('../services/alertStore');
 const { detectAnomalies } = require('../services/anomalyDetector');
 const { generateAlertWithAI } = require('../services/llmService');
-const { sendAlertEmail } = require('../services/emailService');
+const { sendAlertEmail, sendBatchReportEmail } = require('../services/emailService');
 const logger = require('../utils/logger');
 
 /**
@@ -57,13 +57,6 @@ const processApiData = async (req, res, next) => {
             ai_alert: aiAlert,
             is_active: true
           });
-
-          // Optional email alert for high/critical anomalies
-          if (['HIGH', 'CRITICAL'].includes(detectionResult.severity)) {
-            sendAlertEmail(savedAnomaly).catch((err) =>
-              logger.error(`Async email failed: ${err.message}`)
-            );
-          }
         } catch (saveErr) {
           logger.error(`Alert save error: ${saveErr.message}`);
           savedAnomaly = {
@@ -92,10 +85,24 @@ const processApiData = async (req, res, next) => {
 
     logger.info(`Processed ${items.length} items. Detected ${detectedAnomalies.length} anomalies.`);
 
+    // 7.4 Send anomaly reports via email
+    if (detectedAnomalies.length > 0) {
+      if (detectedAnomalies.length === 1) {
+        sendAlertEmail(detectedAnomalies[0]).catch((err) =>
+          logger.error(`Async email alert failed: ${err.message}`)
+        );
+      } else {
+        sendBatchReportEmail(detectedAnomalies, { total_processed: items.length }).catch((err) =>
+          logger.error(`Async batch email report failed: ${err.message}`)
+        );
+      }
+    }
+
     return res.status(200).json({
       success: true,
       total_processed: items.length,
       anomalies_count: detectedAnomalies.length,
+      email_dispatched: detectedAnomalies.length > 0,
       results: processedResults
     });
   } catch (error) {

@@ -81,6 +81,13 @@ PORT=5000
 MONGODB_URI=mongodb://localhost:27017/intelligent-api-monitor
 OPENAI_API_KEY=your_openai_api_key_here
 AI_MODEL=gpt-4o-mini
+
+# 7.4 Feature: Email Anomaly Alerts & Reports (SMTP)
+EMAIL_SERVICE=gmail
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_gmail_app_password
+ALERT_RECIPIENT_EMAIL=recipient@example.com
+
 ```
 
 ### 4. Running the Application
@@ -152,6 +159,26 @@ The server and dashboard will be available at:
 ### 3. Resolve Alert
 - **Method:** `PATCH /alerts/:id/resolve`
 - **Response:** Marks the alert as resolved (`is_active: false`).
+
+### 4. Test Email Anomaly Report (Section 7.4)
+- **Method:** `POST /alerts/test-email`
+- **Response:** Sends an immediate simulated anomaly alert verification email to `ALERT_RECIPIENT_EMAIL`.
+```json
+{
+  "success": true,
+  "message": "Test anomaly report successfully sent to sdey202074@bscse.uiu.ac.bd"
+}
+```
+
+---
+
+## 📧 Email Anomaly Reporting (Section 7.4)
+
+The system includes automated SMTP email reporting via Nodemailer:
+- **Dedicated Incident Alerts:** Automatically sent when severe or critical API anomalies are flagged, containing AI root-cause analysis, HTTP response details, and detection rules.
+- **Consolidated Batch Reports:** When batch telemetry with multiple anomalies is ingested, an aggregated summary digest email is dispatched to the SRE on-call team.
+- **One-Click Testing:** Verified via the **"📧 Test Email Alert"** button on the web dashboard or via `POST /alerts/test-email`.
+
 
 ---
 

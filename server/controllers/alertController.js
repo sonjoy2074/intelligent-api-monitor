@@ -1,4 +1,5 @@
 const alertStore = require('../services/alertStore');
+const { sendTestEmail } = require('../services/emailService');
 
 /**
  * Fetch all active anomalies / alerts
@@ -43,7 +44,39 @@ const resolveAlert = async (req, res, next) => {
   }
 };
 
+/**
+ * Send a verification test email
+ * POST /alerts/test-email
+ */
+const sendTestAlert = async (req, res, next) => {
+  try {
+    const recipient = (process.env.ALERT_RECIPIENT_EMAIL || '').trim();
+    if (!recipient) {
+      return res.status(400).json({
+        success: false,
+        message: 'ALERT_RECIPIENT_EMAIL is not configured in .env'
+      });
+    }
+
+    const sent = await sendTestEmail();
+    if (sent) {
+      return res.status(200).json({
+        success: true,
+        message: `Test anomaly report successfully sent to ${recipient}`
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send test email. Please check SMTP credentials in .env.'
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getActiveAlerts,
-  resolveAlert
+  resolveAlert,
+  sendTestAlert
 };
