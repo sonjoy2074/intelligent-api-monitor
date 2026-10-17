@@ -18,6 +18,19 @@ An intelligent, AI-powered API monitoring and incident alerting system built wit
 
 ---
 
+## 🏛️ System Architecture
+
+![System Architecture](image/architectural_diagram.png)
+
+The architectural pipeline consists of 5 modular stages:
+1. **Telemetry Ingestion:** Ingests external API responses via batch JSON payloads or `POST /monitor`.
+2. **Rule-Based Anomaly Detection:** Deterministic evaluation of HTTP status codes, latency spikes, and zero/empty payload returns.
+3. **AI-Powered Incident Intelligence:** LLM synthesis via OpenAI `gpt-4o-mini` producing human-readable alerts with root-cause insights.
+4. **Resilient Persistence:** Dual-layer storage (MongoDB with automatic in-memory fallback).
+5. **Incident Dispatch & Management:** Automated email alerting via SMTP (Nodemailer) and real-time interactive dashboard management (`GET /alerts`, `PATCH /alerts/:id/resolve`).
+
+---
+
 ## 📁 Project Structure
 
 ```text
@@ -28,6 +41,8 @@ intelligent-api-monitor/
 ├── package.json               # Node.js project configuration and dependencies
 ├── README.md                  # Comprehensive setup and project documentation
 ├── AI_Prompts.md              # Documentation of AI prompts and LLM design
+├── image/
+│   └── architectural_diagram.png # System architectural diagram
 ├── data/
 │   └── sample_api_input.json  # Benchmark test inputs (PatientDataAPI, AppointmentAPI, etc.)
 ├── server/

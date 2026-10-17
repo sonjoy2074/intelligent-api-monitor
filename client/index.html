@@ -35,7 +35,7 @@
           <span>Engine Active</span>
         </div>
         <button id="btn-test-email" class="btn btn-secondary" title="Send a verification anomaly report email">
-          <span class="btn-icon">📧</span> Test Email Alert
+          <span class="btn-icon"></span> Test Email Alert
         </button>
         <button id="refresh-alerts-btn" class="btn btn-secondary">
           <span class="btn-icon">🔄</span> Refresh Feed
@@ -50,7 +50,7 @@
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Total Active Anomalies</span>
-            <span class="stat-icon alert-icon">🚨</span>
+            <span class="stat-icon alert-icon"></span>
           </div>
           <div class="stat-value" id="stat-active-count">0</div>
           <div class="stat-footer text-muted">Awaiting resolution</div>
@@ -59,7 +59,7 @@
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Critical Incidents</span>
-            <span class="stat-icon critical-icon">🔥</span>
+            <span class="stat-icon critical-icon"></span>
           </div>
           <div class="stat-value danger-text" id="stat-critical-count">0</div>
           <div class="stat-footer text-danger">5xx Errors & Outages</div>
@@ -68,7 +68,7 @@
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Avg Anomaly Latency</span>
-            <span class="stat-icon latency-icon">⏱️</span>
+            <span class="stat-icon latency-icon"></span>
           </div>
           <div class="stat-value" id="stat-avg-latency">0 ms</div>
           <div class="stat-footer text-muted">Across active alerts</div>
@@ -77,7 +77,7 @@
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Healthy APIs</span>
-            <span class="stat-icon ai-icon">✅</span>
+            <span class="stat-icon ai-icon"></span>
           </div>
           <div class="stat-value text-success" id="stat-healthy-count">0</div>
           <div class="stat-footer text-muted">Passed all checks</div>
@@ -98,10 +98,10 @@
 
           <div class="quick-actions">
             <button id="btn-load-sample" class="btn btn-outline">
-              📁 Load Benchmark Sample
+              Load Benchmark Sample
             </button>
             <button id="btn-simulate-outage" class="btn btn-outline btn-warn">
-              💥 Inject Outage
+              Inject Outage
             </button>
           </div>
 
@@ -113,7 +113,7 @@
 
           <div class="action-footer">
             <button id="btn-send-telemetry" class="btn btn-primary">
-              <span id="btn-send-text">🚀 Ingest Telemetry Data</span>
+              <span id="btn-send-text">Ingest Telemetry Data</span>
               <span id="btn-send-spinner" class="spinner hidden"></span>
             </button>
             <span id="ingest-status" class="status-note"></span>
